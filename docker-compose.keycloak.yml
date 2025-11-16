@@ -14,7 +14,6 @@ services:
       - keycloak_standalone_data:/var/lib/postgresql/data
     networks:
       - keycloak-standalone-network
-    # AJOUT: Healthcheck pour que le 'depends_on' fonctionne de manière fiable
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
       interval: 10s
