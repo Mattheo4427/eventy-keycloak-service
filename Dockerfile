@@ -8,8 +8,8 @@ ENV KC_METRICS_ENABLED=true
 # Copy realm export into Keycloak import directory
 COPY keycloak-config/eventy-realm-export.json /opt/keycloak/data/import/realm.json
 
-# Build Keycloak in optimized mode
+# Build Keycloak (optional, can skip if using start-dev)
 RUN /opt/keycloak/bin/kc.sh build
 
-# Start Keycloak and import the realm
-ENTRYPOINT ["/opt/keycloak/bin/kc.sh", "start", "--import-realm"]
+# Start Keycloak in development mode and import the realm
+ENTRYPOINT ["/opt/keycloak/bin/kc.sh", "start-dev", "--import-realm"]
