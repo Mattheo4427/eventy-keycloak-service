@@ -1,0 +1,47 @@
+# Java
+*.class
+*.jar
+*.war
+*.ear
+
+# Maven
+/target/
+/pom.xml.tag
+/pom.xml.releaseBackup
+/pom.xml.versionsBackup
+/logs/
+*.log
+
+# Gradle
+/build/
+.gradle/
+*.iml
+
+# IDE files
+.idea/
+*.swp
+*.swo
+*.bak
+*.tmp
+*.orig
+*.rej
+*.DS_Store
+
+# VS Code
+.vscode/
+
+# Keycloak import/export
+keycloak-config/*.json
+
+# Docker
+*.pid
+*.seed
+.env
+docker-compose.override.yml
+
+# OS generated files
+Thumbs.db
+.DS_Store
+
+# Test output
+/test-output/
