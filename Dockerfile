@@ -39,6 +39,8 @@ ENV KC_METRICS_ENABLED=true
 # Note: We always name it 'realm.json'
 COPY keycloak-config/eventy-realm-export.json /opt/keycloak/data/import/realm.json
 
+RUN chown -R keycloak:keycloak /opt/keycloak/data/import/realm.json
+
 # Sets the startup command. It performs two steps:
 # 1. sed: Replaces the {{SECRET_ADMIN_PASSWORD}} placeholder with the value of the $SUPER_ADMIN_PASSWORD environment variable
 # 2. Keycloak: Starts the Keycloak server in development mode and imports the realm.
