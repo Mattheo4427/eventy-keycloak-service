@@ -41,6 +41,6 @@ COPY keycloak-config/eventy-realm-export.json /opt/keycloak/data/import/realm.js
 
 # Sets the startup command. We use a multi-step process for sed to avoid 'Permission denied' errors:
 # 1. Sed outputs the modified content to /tmp/temp_realm.json (always writable).
-# 2. mv overwrites the original file (executed as root, which has permission).
+# 2. cp -f (copy force) overwrites the original file (executed as root, which should have permission).
 # 3. su keycloak -c '...' starts the Keycloak server as the non-root user.
-ENTRYPOINT ["/bin/sh", "-c", "sed 's|{{SECRET_ADMIN_PASSWORD}}|$SUPER_ADMIN_PASSWORD|g' /opt/keycloak/data/import/realm.json > /tmp/temp_realm.json && mv /tmp/temp_realm.json /opt/keycloak/data/import/realm.json && su keycloak -c '/opt/keycloak/bin/kc.sh start-dev --import-realm'"]
+ENTRYPOINT ["/bin/sh", "-c", "sed 's|{{SECRET_ADMIN_PASSWORD}}|$SUPER_ADMIN_PASSWORD|g' /opt/keycloak/data/import/realm.json > /tmp/temp_realm.json && cp -f /tmp/temp_realm.json /opt/keycloak/data/import/realm.json && su keycloak -c '/opt/keycloak/bin/kc.sh start-dev --import-realm'"]
