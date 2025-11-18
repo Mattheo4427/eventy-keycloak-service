@@ -25,6 +25,7 @@ COPY --from=maven-builder /build/target/*.jar /opt/keycloak/providers/
 RUN /opt/keycloak/bin/kc.sh build
 
 # Stage 3: Final runtime image
+# Utilisons la même version que le builder
 FROM quay.io/keycloak/keycloak:26.4.0
 
 # Copy built Keycloak from builder stage
@@ -38,10 +39,8 @@ ENV KC_METRICS_ENABLED=true
 # Note: We always name it 'realm.json'
 COPY keycloak-config/eventy-realm-export.json /opt/keycloak/data/import/realm.json
 
-# REMOVED: La commande RUN chown échoue.
-# Nous allons utiliser l'utilisateur root pour executer sed, puis basculer vers l'utilisateur keycloak.
-
-# Sets the startup command. It performs two steps:
-# 1. sed: Replaces the {{SECRET_ADMIN_PASSWORD}} placeholder (executed as root, which has permission).
-# 2. Keycloak start: Starts the server using 'su keycloak -c' to switch to the non-root user for security.
-ENTRYPOINT ["/bin/sh", "-c", "sed -i 's|{{SECRET_ADMIN_PASSWORD}}|$SUPER_ADMIN_PASSWORD|g' /opt/keycloak/data/import/realm.json && su keycloak -c '/opt/keycloak/bin/kc.sh start-dev --import-realm'"]
+# Sets the startup command. We use a multi-step process for sed to avoid 'Permission denied' errors:
+# 1. Sed outputs the modified content to /tmp/temp_realm.json (always writable).
+# 2. mv overwrites the original file (executed as root, which has permission).
+# 3. su keycloak -c '...' starts the Keycloak server as the non-root user.
+ENTRYPOINT ["/bin/sh", "-c", "sed 's|{{SECRET_ADMIN_PASSWORD}}|$SUPER_ADMIN_PASSWORD|g' /opt/keycloak/data/import/realm.json > /tmp/temp_realm.json && mv /tmp/temp_realm.json /opt/keycloak/data/import/realm.json && su keycloak -c '/opt/keycloak/bin/kc.sh start-dev --import-realm'"]
