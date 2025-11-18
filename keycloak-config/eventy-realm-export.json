@@ -323,10 +323,12 @@
       "clientAuthenticatorType": "client-secret",
       "redirectUris": [
         "eventy://*",
-        "exp://172.20.10.2:8090/*",
+        "exp://*",
         "*"
       ],
-      "webOrigins": [],
+      "webOrigins": [
+        "*"
+      ],
       "notBefore": 0,
       "bearerOnly": false,
       "consentRequired": false,
