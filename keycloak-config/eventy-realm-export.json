@@ -1190,7 +1190,8 @@
   "smtpServer": {},
   "eventsEnabled": false,
   "eventsListeners": [
-    "jboss-logging"
+    "jboss-logging",
+    "user-sync-event-listener"
   ],
   "enabledEventTypes": [],
   "adminEventsEnabled": false,
