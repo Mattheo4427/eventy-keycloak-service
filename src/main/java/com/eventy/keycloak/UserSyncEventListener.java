@@ -163,18 +163,19 @@ public class UserSyncEventListener implements EventListenerProvider {
     }
 
     /**
-     * Sends the JSON payload as a POST request to the user service.
+     * Sends the JSON payload as a POST request to the user service, 
+     * logging the payload and the error body if the response is not successful.
      */
     private void sendToUserService(String payload) {
         HttpURLConnection conn = null;
         try {
-            // ✅ Utiliser le endpoint interne
+            // Use the internal endpoint
             URL url = new URL(userServiceUrl + "/api/users/internal/keycloak-sync");
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
             
-            // ✅ Ajouter le secret partagé
+            // Add the shared secret header
             String secret = System.getenv("KEYCLOAK_SYNC_SECRET");
             if (secret != null && !secret.isEmpty()) {
                 conn.setRequestProperty("X-Keycloak-Secret", secret);
@@ -186,6 +187,10 @@ public class UserSyncEventListener implements EventListenerProvider {
             conn.setConnectTimeout(5000);
             conn.setReadTimeout(5000);
 
+            // Log the actual payload being sent
+            logger.log(Level.INFO, "Attempting to sync user with payload: " + payload); 
+
+            // Write payload to output stream
             try (OutputStream os = conn.getOutputStream()) {
                 byte[] input = payload.getBytes(StandardCharsets.UTF_8);
                 os.write(input, 0, input.length);
@@ -196,6 +201,20 @@ public class UserSyncEventListener implements EventListenerProvider {
                 logger.log(Level.INFO, "Successfully synced user to service. Response code: " + responseCode);
             } else {
                 logger.log(Level.WARNING, "Failed to sync user to service. Response code: " + responseCode);
+                
+                // CRUCIAL: Read the error body if the response is not 2xx
+                try (InputStream es = conn.getErrorStream()) {
+                    if (es != null) {
+                        // Use try-with-resources and a BufferedReader for safer reading
+                        String errorBody = new BufferedReader(new InputStreamReader(es, StandardCharsets.UTF_8))
+                            .lines().collect(Collectors.joining("\n"));
+                            
+                        // Log the exact validation error returned by the User Service
+                        logger.log(Level.SEVERE, "User Service Error Body (400 or other): " + errorBody);
+                    }
+                } catch (IOException streamEx) {
+                    logger.log(Level.FINE, "Could not read error stream.", streamEx);
+                }
             }
         } catch (Exception e) {
             logger.log(Level.SEVERE, "Error syncing user to service: " + e.getMessage(), e);
