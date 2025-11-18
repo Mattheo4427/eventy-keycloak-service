@@ -1,6 +1,30 @@
 {
   "id": "029e0d99-ed18-476a-b34e-7863478eb73c",
   "realm": "eventy-realm",
+  "users": [
+    {
+      "username": "super_admin",
+      "email": "admin@eventy.com",
+      "enabled": true,
+      "firstName": "Super",
+      "lastName": "Admin",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "{{SECRET_ADMIN_PASSWORD}}",
+          "temporary": true
+        }
+      ],
+      
+      "attributes": {
+        "app_role": ["ADMIN"]
+      },
+      
+      "realmRoles": [
+        "default-roles-eventy"
+      ]
+    }
+  ],
   "displayName": "",
   "displayNameHtml": "",
   "notBefore": 0,

@@ -18,8 +18,8 @@ import java.util.logging.Logger;
 import java.util.logging.Level;
 
 /**
- * Keycloak Event Listener to synchronize user creation events (REGISTER and ADMIN CREATE)
- * to the external eventy-users-service via HTTP POST request.
+ * Keycloak Event Listener to synchronize user creation (REGISTER, ADMIN CREATE) and first LOGIN 
+ * events to the external eventy-users-service via HTTP POST request, including the application role.
  */
 public class UserSyncEventListener implements EventListenerProvider {
     private static final Logger logger = Logger.getLogger(UserSyncEventListener.class.getName());
@@ -34,15 +34,19 @@ public class UserSyncEventListener implements EventListenerProvider {
 
     @Override
     public void onEvent(Event event) {
-        // Handle user self-registration event
+        // Gère l'auto-enregistrement
         if (event.getType() == EventType.REGISTER) {
-            handleUserRegistration(event);
+            handleUserEvent(event);
+        } 
+        // Gère la première connexion (pour les utilisateurs importés ou les cas manqués)
+        else if (event.getType() == EventType.LOGIN) {
+            handleUserEvent(event);
         }
     }
 
     @Override
     public void onEvent(AdminEvent event, boolean includeRepresentation) {
-        // Handle admin-created users event
+        // Gère la création d'utilisateur par un administrateur
         if (event.getResourceType() == ResourceType.USER && 
             event.getOperationType() == OperationType.CREATE) {
             handleAdminUserCreation(event);
@@ -50,26 +54,30 @@ public class UserSyncEventListener implements EventListenerProvider {
     }
 
     /**
-     * Retrieves the UserModel from a standard registration event and initiates sync.
+     * Méthode générique pour gérer les événements Keycloak (REGISTER, LOGIN).
      */
-    private void handleUserRegistration(Event event) {
+    private void handleUserEvent(Event event) {
         String userId = event.getUserId();
         RealmModel realm = session.getContext().getRealm();
-        // The user should exist after a successful REGISTER event
         UserModel user = session.users().getUserById(realm, userId);
         
         if (user != null) {
-            syncUserToService(user);
+            // Détermine le rôle à partir des attributs Keycloak (e.g., app_role: ADMIN)
+            String role = getRoleFromUserAttributes(user);
+            
+            // Tente la synchronisation. Si l'utilisateur existe déjà, le service utilisateur 
+            // devrait gérer le conflit (e.g., ignorer ou faire un UPSERT).
+            syncUserToService(user, role); 
         } else {
-            logger.log(Level.WARNING, "User not found for registration event: " + userId);
+            logger.log(Level.WARNING, "User not found for event " + event.getType() + ": " + userId);
         }
     }
 
+
     /**
-     * Retrieves the UserModel from an admin creation event and initiates sync.
+     * Récupère le UserModel à partir d'un événement de création admin et initie la sync.
      */
     private void handleAdminUserCreation(AdminEvent event) {
-        // Extract user ID from resource path (format: "users/{userId}")
         String resourcePath = event.getResourcePath();
         if (resourcePath != null && resourcePath.startsWith("users/")) {
             String userId = resourcePath.substring(6);
@@ -77,21 +85,36 @@ public class UserSyncEventListener implements EventListenerProvider {
             UserModel user = session.users().getUserById(realm, userId);
             
             if (user != null) {
-                syncUserToService(user);
+                // Détermine le rôle
+                String role = getRoleFromUserAttributes(user);
+                syncUserToService(user, role);
             }
         }
     }
+    
+    /**
+     * Lit l'attribut 'app_role' de l'utilisateur Keycloak.
+     * Si l'attribut est défini (e.g., pour super_admin), il est utilisé. Sinon, le rôle par défaut est 'USER'.
+     */
+    private String getRoleFromUserAttributes(UserModel user) {
+        String appRole = user.getFirstAttribute("app_role");
+        
+        if (appRole != null && !appRole.trim().isEmpty()) {
+            return appRole.toUpperCase();
+        }
+        return "USER"; // Rôle par défaut
+    }
 
     /**
-     * Builds the JSON payload and sends it to the user service.
+     * Construit le payload JSON et l'envoie au service utilisateur.
      */
-    private void syncUserToService(UserModel user) {
+    private void syncUserToService(UserModel user, String role) { // <-- Nouvelle signature
         String username = user.getUsername();
         String email = user.getEmail();
         String firstName = user.getFirstName();
         String lastName = user.getLastName();
 
-        // Validate required fields (must match the @NotBlank constraints in the Spring service DTO)
+        // Ajout de la logique de vérification des attributs.
         if (username == null || username.trim().isEmpty() ||
             email == null || email.trim().isEmpty() ||
             firstName == null || firstName.trim().isEmpty() || 
@@ -101,37 +124,34 @@ public class UserSyncEventListener implements EventListenerProvider {
             return;
         }
 
-        // Build JSON payload - only send fields that match CreateUserRequest DTO
-        // ID, avatarUrl, balance, and creationDate are set by the backend (user service)
-        String payload = buildJsonPayload(username, email, firstName, lastName);
+        // Construction du payload avec le rôle
+        String payload = buildJsonPayload(username, email, firstName, lastName, role); // <-- Nouveau
 
         sendToUserService(payload);
     }
 
     /**
-     * Creates the JSON string for the CreateUserRequest DTO.
+     * Crée la chaîne JSON pour le DTO (inclut maintenant le rôle).
      */
-    private String buildJsonPayload(String username, String email, String firstName, String lastName) {
+    private String buildJsonPayload(String username, String email, String firstName, String lastName, String role) {
         // Escape strings to prevent JSON injection
         username = escapeJson(username);
         email = escapeJson(email);
         firstName = escapeJson(firstName);
         lastName = escapeJson(lastName);
+        role = escapeJson(role); // Escape le rôle aussi
 
         return String.format(
-            "{\"username\":\"%s\",\"email\":\"%s\",\"firstName\":\"%s\",\"lastName\":\"%s\"}",
-            username, email, firstName, lastName
+            "{\"username\":\"%s\",\"email\":\"%s\",\"firstName\":\"%s\",\"lastName\":\"%s\",\"role\":\"%s\"}",
+            username, email, firstName, lastName, role // <-- Nouveau paramètre
         );
     }
 
     /**
      * Escapes special characters in the string for JSON serialization.
-     * Note: Since we check for null/empty values in syncUserToService, 
-     * this method should not receive null or empty strings.
      */
     private String escapeJson(String value) {
         if (value == null) {
-            // Should be caught by the check in syncUserToService, but kept for safety.
             return ""; 
         }
         return value
@@ -148,6 +168,7 @@ public class UserSyncEventListener implements EventListenerProvider {
     private void sendToUserService(String payload) {
         HttpURLConnection conn = null;
         try {
+            // ... (logique de connexion HTTP inchangée) ...
             URL url = new URL(userServiceUrl + "/api/users");
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
@@ -165,7 +186,6 @@ public class UserSyncEventListener implements EventListenerProvider {
             if (responseCode >= 200 && responseCode < 300) {
                 logger.log(Level.INFO, "Successfully synced user to service. Response code: " + responseCode);
             } else {
-                // If we get a 400 Bad Request, log the details for diagnosis
                 logger.log(Level.WARNING, "Failed to sync user to service. Response code: " + responseCode);
             }
         } catch (Exception e) {
