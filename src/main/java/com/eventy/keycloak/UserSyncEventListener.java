@@ -12,10 +12,17 @@ import org.keycloak.models.RealmModel;
 
 import java.net.HttpURLConnection;
 import java.net.URL;
+
 import java.io.OutputStream;
+import java.io.InputStream;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.IOException;
+
 import java.nio.charset.StandardCharsets;
 import java.util.logging.Logger;
 import java.util.logging.Level;
+import java.util.stream.Collectors;
 
 /**
  * Keycloak Event Listener to synchronize user creation (REGISTER, ADMIN CREATE) and first LOGIN 
@@ -34,11 +41,11 @@ public class UserSyncEventListener implements EventListenerProvider {
 
     @Override
     public void onEvent(Event event) {
-        // Gère l'auto-enregistrement
+        // Handle self-registration
         if (event.getType() == EventType.REGISTER) {
             handleUserEvent(event);
         } 
-        // Gère la première connexion (pour les utilisateurs importés ou les cas manqués)
+        // Handle login (for imported users or resync)
         else if (event.getType() == EventType.LOGIN) {
             handleUserEvent(event);
         }
@@ -46,7 +53,7 @@ public class UserSyncEventListener implements EventListenerProvider {
 
     @Override
     public void onEvent(AdminEvent event, boolean includeRepresentation) {
-        // Gère la création d'utilisateur par un administrateur
+        // Handle user creation by an administrator
         if (event.getResourceType() == ResourceType.USER && 
             event.getOperationType() == OperationType.CREATE) {
             handleAdminUserCreation(event);
@@ -54,7 +61,7 @@ public class UserSyncEventListener implements EventListenerProvider {
     }
 
     /**
-     * Méthode générique pour gérer les événements Keycloak (REGISTER, LOGIN).
+     * Generic method to handle Keycloak user events (REGISTER, LOGIN).
      */
     private void handleUserEvent(Event event) {
         String userId = event.getUserId();
@@ -62,11 +69,10 @@ public class UserSyncEventListener implements EventListenerProvider {
         UserModel user = session.users().getUserById(realm, userId);
         
         if (user != null) {
-            // Détermine le rôle à partir des attributs Keycloak (e.g., app_role: ADMIN)
+            // Determine the role from Keycloak attributes (e.g., app_role: ADMIN)
             String role = getRoleFromUserAttributes(user);
             
-            // Tente la synchronisation. Si l'utilisateur existe déjà, le service utilisateur 
-            // devrait gérer le conflit (e.g., ignorer ou faire un UPSERT).
+            // Attempt synchronization. The user service should handle UPSERT/conflict.
             syncUserToService(user, role); 
         } else {
             logger.log(Level.WARNING, "User not found for event " + event.getType() + ": " + userId);
@@ -75,7 +81,7 @@ public class UserSyncEventListener implements EventListenerProvider {
 
 
     /**
-     * Récupère le UserModel à partir d'un événement de création admin et initie la sync.
+     * Retrieves the UserModel from an admin creation event and initiates the sync.
      */
     private void handleAdminUserCreation(AdminEvent event) {
         String resourcePath = event.getResourcePath();
@@ -85,7 +91,7 @@ public class UserSyncEventListener implements EventListenerProvider {
             UserModel user = session.users().getUserById(realm, userId);
             
             if (user != null) {
-                // Détermine le rôle
+                // Determine the role
                 String role = getRoleFromUserAttributes(user);
                 syncUserToService(user, role);
             }
@@ -93,8 +99,8 @@ public class UserSyncEventListener implements EventListenerProvider {
     }
     
     /**
-     * Lit l'attribut 'app_role' de l'utilisateur Keycloak.
-     * Si l'attribut est défini (e.g., pour super_admin), il est utilisé. Sinon, le rôle par défaut est 'USER'.
+     * Reads the 'app_role' attribute from the Keycloak user.
+     * If defined, it's used. Otherwise, the default role is 'USER'.
      */
     private String getRoleFromUserAttributes(UserModel user) {
         String appRole = user.getFirstAttribute("app_role");
@@ -102,19 +108,19 @@ public class UserSyncEventListener implements EventListenerProvider {
         if (appRole != null && !appRole.trim().isEmpty()) {
             return appRole.toUpperCase();
         }
-        return "USER"; // Rôle par défaut
+        return "USER"; // Default role
     }
 
     /**
-     * Construit le payload JSON et l'envoie au service utilisateur.
+     * Constructs the JSON payload and sends it to the user service.
      */
-    private void syncUserToService(UserModel user, String role) { // <-- Nouvelle signature
+    private void syncUserToService(UserModel user, String role) { 
         String username = user.getUsername();
         String email = user.getEmail();
         String firstName = user.getFirstName();
         String lastName = user.getLastName();
 
-        // Ajout de la logique de vérification des attributs.
+        // Pre-validation to skip sync if required fields are missing or only contain whitespace.
         if (username == null || username.trim().isEmpty() ||
             email == null || email.trim().isEmpty() ||
             firstName == null || firstName.trim().isEmpty() || 
@@ -124,14 +130,14 @@ public class UserSyncEventListener implements EventListenerProvider {
             return;
         }
 
-        // Construction du payload avec le rôle
-        String payload = buildJsonPayload(username, email, firstName, lastName, role); // <-- Nouveau
+        // Build the payload with the role
+        String payload = buildJsonPayload(username, email, firstName, lastName, role); 
 
         sendToUserService(payload);
     }
 
     /**
-     * Crée la chaîne JSON pour le DTO (inclut maintenant le rôle).
+     * Creates the JSON string for the DTO (includes the role).
      */
     private String buildJsonPayload(String username, String email, String firstName, String lastName, String role) {
         // Escape strings to prevent JSON injection
@@ -139,11 +145,11 @@ public class UserSyncEventListener implements EventListenerProvider {
         email = escapeJson(email);
         firstName = escapeJson(firstName);
         lastName = escapeJson(lastName);
-        role = escapeJson(role); // Escape le rôle aussi
+        role = escapeJson(role); 
 
         return String.format(
             "{\"username\":\"%s\",\"email\":\"%s\",\"firstName\":\"%s\",\"lastName\":\"%s\",\"role\":\"%s\"}",
-            username, email, firstName, lastName, role // <-- Nouveau paramètre
+            username, email, firstName, lastName, role 
         );
     }
 
