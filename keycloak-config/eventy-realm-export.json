@@ -21,7 +21,8 @@
       },
       
       "realmRoles": [
-        "default-roles-eventy"
+        "default-roles-eventy",
+        "ADMIN"
       ]
     }
   ],
