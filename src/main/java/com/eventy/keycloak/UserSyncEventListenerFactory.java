@@ -19,7 +19,7 @@ public class UserSyncEventListenerFactory implements EventListenerProviderFactor
         // Read from environment variable
         userServiceUrl = System.getenv("USER_SERVICE_URL");
         if (userServiceUrl == null || userServiceUrl.isEmpty()) {
-            userServiceUrl = "http://localhost:8080"; // fallback
+            throw new IllegalStateException("USER_SERVICE_URL environment variable is not set");
         }
     }
 
