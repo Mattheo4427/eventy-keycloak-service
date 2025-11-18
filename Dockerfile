@@ -42,5 +42,4 @@ COPY keycloak-config/eventy-realm-export.json /opt/keycloak/data/import/realm.js
 # Sets the startup command. It performs two steps:
 # 1. sed: Replaces the {{SECRET_ADMIN_PASSWORD}} placeholder with the value of the $SUPER_ADMIN_PASSWORD environment variable
 # 2. Keycloak: Starts the Keycloak server in development mode and imports the realm.
-# CORRECTION: Utilisation de la "forme exec" (JSON Array) pour le CMD afin d'éviter les conflits avec l'ENTRYPOINT de l'image de base.
-CMD ["/bin/sh", "-c", "sed -i 's|{{SECRET_ADMIN_PASSWORD}}|$SUPER_ADMIN_PASSWORD|g' /opt/keycloak/data/import/realm.json && /opt/keycloak/bin/kc.sh start-dev --import-realm"]
+ENTRYPOINT ["/bin/sh", "-c", "sed -i 's|{{SECRET_ADMIN_PASSWORD}}|$SUPER_ADMIN_PASSWORD|g' /opt/keycloak/data/import/realm.json && /opt/keycloak/bin/kc.sh start-dev --import-realm"]
