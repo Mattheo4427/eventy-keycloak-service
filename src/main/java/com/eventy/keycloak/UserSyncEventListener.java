@@ -131,7 +131,8 @@ public class UserSyncEventListener implements EventListenerProvider {
         }
 
         // Build the payload with the role
-        String payload = buildJsonPayload(username, email, firstName, lastName, role); 
+        String keycloakId = user.getId();
+        String payload = buildJsonPayload(keycloakId, username, email, firstName, lastName, role);
 
         sendToUserService(payload);
     }
@@ -139,17 +140,12 @@ public class UserSyncEventListener implements EventListenerProvider {
     /**
      * Creates the JSON string for the DTO (includes the role).
      */
-    private String buildJsonPayload(String username, String email, String firstName, String lastName, String role) {
-        // Escape strings to prevent JSON injection
-        username = escapeJson(username);
-        email = escapeJson(email);
-        firstName = escapeJson(firstName);
-        lastName = escapeJson(lastName);
-        role = escapeJson(role); 
-
+    private String buildJsonPayload(String id, String username, String email, String firstName, String lastName, String role) {
+        
         return String.format(
-            "{\"username\":\"%s\",\"email\":\"%s\",\"firstName\":\"%s\",\"lastName\":\"%s\",\"role\":\"%s\"}",
-            username, email, firstName, lastName, role 
+            "{\"id\":\"%s\",\"username\":\"%s\",\"email\":\"%s\",\"firstName\":\"%s\",\"lastName\":\"%s\",\"role\":\"%s\"}",
+            escapeJson(id), escapeJson(username), escapeJson(email),
+            escapeJson(firstName), escapeJson(lastName), escapeJson(role)
         );
     }
 
