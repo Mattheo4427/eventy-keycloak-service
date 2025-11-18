@@ -168,11 +168,20 @@ public class UserSyncEventListener implements EventListenerProvider {
     private void sendToUserService(String payload) {
         HttpURLConnection conn = null;
         try {
-            // ... (logique de connexion HTTP inchangée) ...
-            URL url = new URL(userServiceUrl + "/api/users");
+            // ✅ Utiliser le endpoint interne
+            URL url = new URL(userServiceUrl + "/api/users/internal/keycloak-sync");
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+            
+            // ✅ Ajouter le secret partagé
+            String secret = System.getenv("KEYCLOAK_SYNC_SECRET");
+            if (secret != null && !secret.isEmpty()) {
+                conn.setRequestProperty("X-Keycloak-Secret", secret);
+            } else {
+                logger.log(Level.WARNING, "KEYCLOAK_SYNC_SECRET not set, sync may fail");
+            }
+            
             conn.setDoOutput(true);
             conn.setConnectTimeout(5000);
             conn.setReadTimeout(5000);
