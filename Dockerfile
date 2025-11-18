@@ -11,7 +11,7 @@ COPY src ./src
 RUN mvn clean package -DskipTests
 
 # Stage 2: Build Keycloak with the provider
-FROM quay.io/keycloak/keycloak:26.0.0 AS keycloak-builder
+FROM quay.io/keycloak/keycloak:26.4.0 AS keycloak-builder
 
 # Enable health checks and metrics
 ENV KC_HEALTH_ENABLED=true
