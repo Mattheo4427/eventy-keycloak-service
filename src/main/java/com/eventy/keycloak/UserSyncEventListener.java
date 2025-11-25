@@ -172,7 +172,7 @@ public class UserSyncEventListener implements EventListenerProvider {
         HttpURLConnection conn = null;
         try {
             // Use the internal endpoint
-            URL url = new URL(userServiceUrl + "/api/users/internal/keycloak-sync");
+            URL url = new URL(userServiceUrl + "/users/internal/keycloak-sync");
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
